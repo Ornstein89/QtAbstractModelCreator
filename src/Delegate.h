@@ -7,7 +7,7 @@
 class Delegate : public QStyledItemDelegate
 {
 public:
-    Delegate(QObject *parent);
+    Delegate(QObject *parent = nullptr);
 
     QStringList listTypes;
 

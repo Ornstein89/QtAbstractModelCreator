@@ -28,7 +28,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
 
     /* widget'ы самой первой строки */
-    QComboBox * cb =
+    /*QComboBox * cb =
             new QComboBox( ui->tblProperties );
     cb->setEditable(true);
 
@@ -36,12 +36,20 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->tblProperties
             ->setCellWidget (
                 ui->tblProperties->rowCount()-1,
-                1, cb );
+                1, cb );*/
 
     /*ui->tblProperties
             ->setCellWidget (
                 ui->tblProperties->rowCount()-1,
                 1, cb );*/
+    /*for(int i = 0; i < 4; i++)
+    {
+        QTableWidgetItem * itm = new QTableWidgetItem();
+        ui->tblProperties->setItem(0, i, itm);
+    }*/
+
+    Delegate * dlgt = new Delegate(ui->tblProperties);
+    ui->tblProperties->setItemDelegate(dlgt);
 
     /* загрузка шаблонов */
     if (!LoadSampleFiles())
@@ -100,7 +108,7 @@ void MainWindow::on_tblProperties_cellChanged(int row, int column)
                  << ui->tblProperties->item(row, i);
         //qDebug() << "*** text() = " << ui->tblProperties->item(row, i)->text();
         if(ui->tblProperties->item(row, i) == nullptr)
-            continue;
+            break;
         if(i == 1)
             if(QComboBox(ui->tblProperties->cellWidget(row, i)).currentText().isEmpty())
                 continue;
@@ -133,7 +141,7 @@ void MainWindow::on_tblProperties_cellChanged(int row, int column)
             qDebug() << "*** setText() OK";*/
 
             //https://stackoverflow.com/questions/3172415/qcombobox-and-qspinbox-in-qtablewidget-with-appropriate-alignment?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
-            QComboBox * cb =
+            /*QComboBox * cb =
                     new QComboBox( ui->tblProperties );
             cb->setEditable(true);
 
@@ -142,7 +150,7 @@ void MainWindow::on_tblProperties_cellChanged(int row, int column)
             ui->tblProperties
                     ->setCellWidget (
                         ui->tblProperties->rowCount()-1,
-                        1, cb );
+                        1, cb );*/
             qDebug() << "*** setCellWidget() OK";
             /*ui->tblProperties
                     ->horizontalHeader()
@@ -251,9 +259,11 @@ void MainWindow::on_btnCreteModel_clicked()
     // TODO фильтрация ввод по синтаксису C++
 
     names();
+    qDebug() << "*** names() OK";
     ui->tabsCodePages->setTabText(0, strFileName + ".h");
     ui->tabsCodePages->setTabText(1, strFileName + ".cpp");
     parameterList();
+    qDebug() << "*** parameterList() OK";
     foreach(PropRecord it, lstProperties)
     {
         listGetMethods << it.type
@@ -263,6 +273,7 @@ void MainWindow::on_btnCreteModel_clicked()
                        + it.property.remove(0, 1)
                        + "() const";
     }
+    qDebug() << "*** lstProperties() OK";
 
     foreach(PropRecord it, lstProperties)
     {
@@ -274,10 +285,12 @@ void MainWindow::on_btnCreteModel_clicked()
     listCopyConstructorParameters =
             listCopyConstructorParameters.
             left(listCopyConstructorParameters.length() - 2);
-
+    qDebug() << "*** listCopyConstructorParameters() OK";
 
     CombineCpp();
+    qDebug() << "*** CombineCpp() OK";
     CombineHeader();
+    qDebug() << "*** CombineHeader() OK";
 
     ui->edtCpp->setText(cppCode);
     ui->edtHeader->setText(hCode);
