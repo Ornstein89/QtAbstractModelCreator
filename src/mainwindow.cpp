@@ -6,6 +6,7 @@
 #include <QStringList>
 #include <QFile>
 #include <QMessageBox>
+#include "Delegate.h"
 // 1) список полей
 // 2) название dataobjet:
 // 3) set- и get- методы
@@ -13,6 +14,12 @@
 // model:
 // 5) enum roles
 
+// +TODO #include
+// TODO #define
+// TODO при заполнении названий свойств заполняются roles и names
+// placeholder у roles и names
+// TODO перемещения и удаление свойств
+// TODO плагин QT
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -20,17 +27,23 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
 
+    /* widget'ы самой первой строки */
     QComboBox * cb =
             new QComboBox( ui->tblProperties );
     cb->setEditable(true);
-    QStringList list;
-    list << "QString" << "int" << "double" << "char" << "undigned int";
-    cb->addItems(list);
+
+    cb->addItems(listTypes);
     ui->tblProperties
             ->setCellWidget (
                 ui->tblProperties->rowCount()-1,
-                1,
-                cb );
+                1, cb );
+
+    /*ui->tblProperties
+            ->setCellWidget (
+                ui->tblProperties->rowCount()-1,
+                1, cb );*/
+
+    /* загрузка шаблонов */
     if (!LoadSampleFiles())
     {
         QMessageBox::critical(this, "Ошибка", "Файлы-шаблоны tmpClass.cpp\nи tmpClass.h не найдены");
@@ -124,15 +137,12 @@ void MainWindow::on_tblProperties_cellChanged(int row, int column)
                     new QComboBox( ui->tblProperties );
             cb->setEditable(true);
 
-            QStringList list;
-            list << "QString" << "int" << "double";
-            cb->addItems(list);
+            cb->addItems(listTypes);
 
             ui->tblProperties
                     ->setCellWidget (
                         ui->tblProperties->rowCount()-1,
-                        1,
-                        cb );
+                        1, cb );
             qDebug() << "*** setCellWidget() OK";
             /*ui->tblProperties
                     ->horizontalHeader()
@@ -203,6 +213,37 @@ void MainWindow::names()
     {
         ui->edtFileName1->text();
     }
+
+    if(ui->chkController->checkState() == Qt::Checked)
+    {
+        QString strControllerName1;
+        if(ui->edtControllerName1->text().isEmpty())
+        {
+            strControllerName1 = "Data";
+        }
+        else
+        {
+            strControllerName1 = ui->edtControllerName1->text();
+        }
+
+        QString strControllerName2;
+        if(ui->edtControllerName2->text().isEmpty())
+        {
+            strControllerName2 = "Model";
+        }
+        else
+        {
+            strControllerName2 = ui->edtControllerName2->text();
+        }
+
+        strControllerName =
+                strControllerName1
+                + strControllerName2;
+    }
+    else
+    {
+        strControllerName.clear();
+    }
 }
 
 void MainWindow::on_btnCreteModel_clicked()
@@ -213,7 +254,30 @@ void MainWindow::on_btnCreteModel_clicked()
     ui->tabsCodePages->setTabText(0, strFileName + ".h");
     ui->tabsCodePages->setTabText(1, strFileName + ".cpp");
     parameterList();
+    foreach(PropRecord it, lstProperties)
+    {
+        listGetMethods << it.type
+                       + " "
+                       + "get"
+                       + it.property[0].toUpper()
+                       + it.property.remove(0, 1)
+                       + "() const";
+    }
+
+    foreach(PropRecord it, lstProperties)
+    {
+        listCopyConstructorParameters +=
+                "const "
+                + it.type
+                + " &p_" + it.property + ",\n";
+    }
+    listCopyConstructorParameters =
+            listCopyConstructorParameters.
+            left(listCopyConstructorParameters.length() - 2);
+
+
     CombineCpp();
+    CombineHeader();
 
     ui->edtCpp->setText(cppCode);
     ui->edtHeader->setText(hCode);
@@ -246,35 +310,121 @@ void MainWindow::parameterList()
             << lstProperties[0].qml_name;
 }
 
-QString MainWindow::CombineCpp()
+void MainWindow::CombineCpp()
 {
     QString result;
 
     cppCode.replace("<<objClassName>>", strObjClassName);
     cppCode.replace("<<modelClassName>>", strObjModelName);
 
-    /* замены для cpp
-    "<<listPrivateAssign1>>"
-    "<<listPrivateAssign2>>"
-    "<<listReturnByRole>>"
-    "<<listRolesAndNames>>"
-    "<<controllerClassName>>"*/
+    // <<listCopyConstructorParameters>>
+    cppCode.replace("<<listCopyConstructorParameters>>",
+                    listCopyConstructorParameters);
 
+    // "<<listPrivateAssign1>>"
+    QString listPrivateAssign1;
+    foreach(PropRecord it, lstProperties)
+    {
+        listPrivateAssign1 += "m_" + it.property + "(p_"+it.property+"),\n";
+    }
+    listPrivateAssign1 = listPrivateAssign1.left(listPrivateAssign1.length()-1);
+    cppCode.replace("<<listPrivateAssign1>>",
+                    listPrivateAssign1);
+
+    // "<<listPrivateAssign2>>"
+    /*QString listPrivateAssign2;
+
+    cppCode.replace("<<listPrivateAssign2>>",
+                    listPrivateAssign1);*/
+
+
+    // "<<listReturnByRole>>"
+    QString listReturnByRole;
+    listReturnByRole = "const " + strObjClassName +
+            "&itemToReturn = m_items[index.row()];\n";
+
+    foreach(PropRecord it, lstProperties)
+    {
+        listReturnByRole += "if (role == " + it.role + ")\n"
+        + "return itemToReturn.get"
+        + it.property[0].toUpper() + it.property.right(1)
+        + "();\n" + "else ";
+    }
+    listReturnByRole = listReturnByRole.left(listReturnByRole.length() - 5);
+    cppCode.replace("<<listReturnByRole>>",
+                    listReturnByRole);
+
+    // "<<listRolesAndNames>>"
+    QString listRolesAndNames;
+    foreach(PropRecord it, lstProperties)
+    {
+        listRolesAndNames += "\troles["
+                + it.role + "] = \""
+                + it.qml_name + "\";\n";
+    }
+    cppCode.replace("<<listRolesAndNames>>",
+                    listRolesAndNames);
+
+    // "<<controllerClassName>>"
+    if(ui->chkController->checkState() == Qt::Checked)
+    {
+        cppCode.replace("<<controllerClassName>>",
+                      strControllerName);
+    }
+    else
+    {
+        int pos = cppCode.indexOf("<<controllerClassName>>");
+        pos = cppCode.lastIndexOf('}',pos);
+        pos++;
+        cppCode = cppCode.left(pos); // TODO возможно эта отрезает до rowCount
+    }
+
+    // TODO переделать в pairs "строка" - "замена"
+    // TODO в один цикл foreach
+
+    // <<listGetMethodsDefinitions>>
+    QString listGetMethodsDefinitions;
+    foreach (QString getMethod, listGetMethods) {
+        listGetMethodsDefinitions +=
+                getMethod
+                + "\n{\nreturn;\n}\n";
+    }
+    listGetMethodsDefinitions.chop(1);
+
+    cppCode.replace("<<listGetMethodsDefinitions>>",
+                    listGetMethodsDefinitions);
+    // <<fileName>> в #include
+    cppCode.replace("<<fileName>>",
+                    strFileName);
+
+    return;
+
+}
+
+void MainWindow::CombineHeader()
+{
     hCode.replace("<<objClassName>>", strObjClassName);
     hCode.replace("<<modelClassName>>", strObjModelName);
 
     // замены для h
     //"<<listGetMethodsDeclarations>>"
-    //"<<listPrivatePropertiesDeclarations>>"
+    QString listGetMethodsDeclarations;
+    foreach(QString it, listGetMethods)
+    {
+        listGetMethodsDeclarations +=
+                '\t' + it + ";\n";
+    }
+    hCode.replace("<<listGetMethodsDeclarations>>",
+                  listGetMethodsDeclarations);
 
+    //"<<listPrivatePropertiesDeclarations>>"
     //  имя   тип  роль   названиеQML
     QString listPrivatePropertiesDeclarations;
     foreach(PropRecord it, lstProperties)
     {
         listPrivatePropertiesDeclarations +=
-                '\t' + it.type + " m_" + it.property + '\n';
+                '\t' + it.type + " m_" + it.property + ";\n";
     }
-
     hCode.replace("<<listPrivatePropertiesDeclarations>>", listPrivatePropertiesDeclarations);
 
     //"<<listRoles>>"
@@ -291,66 +441,65 @@ QString MainWindow::CombineCpp()
         }
         listRoles += ",\n";
     }
+    listRoles = listRoles.left(listRoles.length()-2);
 
     hCode.replace("<<listRoles>>", listRoles);
 
-    //"<<controllerClassName>>"
+    // "<<controllerClassName>>"
+    if(ui->chkController->checkState() == Qt::Checked)
+    {
+        hCode.replace("<<controllerClassName>>",
+                      strControllerName);
+    }
+    else
+    {
+        int pos = hCode.indexOf("<<controllerClassName>>");
+        pos = hCode.lastIndexOf('}',pos);
+        pos++;
+        hCode = hCode.left(pos);
+    }
 
-
-    // TODO переделать в pairs "строка" - "замена"
-
-    return result;
-
+    // <<listCopyConstructorParameters>>
+    // TODO
+    hCode.replace("<<listCopyConstructorParameters>>",
+                  listCopyConstructorParameters);
 }
-/*
-QString CombineHeader(QString objClassName,
-                      QString modelClassName)
+
+
+void MainWindow::on_chkController_stateChanged(int arg1)
 {
-    QString result;
-
-    class NoteObject
+    if(arg1 == Qt::Checked)
     {
-    public:
-        NoteObject(const QString &datetime,
-                   const QString &caption,
-                   const QString &reference,
-                   const QString &path,
-                   const int &atch);
-        //get-методы
-        for()
-        {
-            result.append(тип + " " + название_параметра + "() const;\n");
-
-//        QString dateTime() const;
-//        QString caption() const;
-//        QString reference() const;
-//        QString path() const;
-//        bool isText() const;
-//        bool isScreenshot() const;
-//        bool isAudio() const;
-//        bool isVideo() const;
-//        bool isPhoto() const;
+        ui->edtControllerName1->setEnabled(true);
+        ui->edtControllerName2->setEnabled(true);
     }
-
-    result.append("private:\n");
-
-    // свойства
-    for()
+    else
     {
-        result.append(тип + "\tm_" + название_параметра + ";\n");
-//        QString m_datetime;
-//        QString m_caption;
-//        QString m_reference;
-//        QString m_path;
-//        bool m_text;
-//        bool m_screenshot;
-//        bool m_audio;
-//        bool m_photo;
-//        bool m_video;
+        ui->edtControllerName1->setEnabled(false);
+        ui->edtControllerName2->setEnabled(false);
     }
-
-    append("};\n\n");
-
-    return result;
 }
-*/
+
+void MainWindow::on_btnSave_clicked()
+{
+    QFile file(strFileName + ".cpp");
+          if (!file.open(QIODevice::ReadWrite
+                         | QIODevice::Text
+                         | QIODevice::Truncate))
+              return;
+    QTextStream out1(&file);
+    out1 << cppCode;
+    file.close();
+    qDebug() << "*** cppCode written";
+
+    file.setFileName(strFileName + ".h");
+          if (!file.open(QIODevice::ReadWrite
+                         | QIODevice::Text
+                         | QIODevice::Truncate))
+              return;
+    QTextStream out2(&file);
+    out2 << hCode;
+    file.close();
+    qDebug() << "*** hCode written";
+    return;
+}

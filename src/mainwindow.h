@@ -3,6 +3,9 @@
 
 #include <QMainWindow>
 #include <QComboBox>
+#include <QHash>
+#include <QList>
+#include <QStringList>
 
 namespace Ui {
 class MainWindow;
@@ -15,7 +18,7 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
-    QString CombineCpp();
+    void CombineCpp();
     bool LoadSampleFiles();
     QString cppCode;
     QString hCode;
@@ -63,16 +66,25 @@ public:
 
     typedef QList<PropRecord> typePropList;
     typePropList lstProperties;
-    QString strObjClassName, strObjModelName, strFileName;
+    QString strObjClassName, strObjModelName,
+    strControllerName, strFileName,
+    listCopyConstructorParameters;
+    QStringList listGetMethods;
+    QStringList listTypes;
     //  имя   тип  роль   названиеQML
 
     void names();
     void parameterList();
+    void CombineHeader();
 private slots:
     void on_tblProperties_cellChanged(int row, int column);
 
     void on_btnCreteModel_clicked();
 
+
+    void on_chkController_stateChanged(int arg1);
+
+    void on_btnSave_clicked();
 
 private:
     Ui::MainWindow *ui;
